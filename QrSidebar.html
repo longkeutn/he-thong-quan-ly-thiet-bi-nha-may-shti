@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <script src="https://cdn.jsdelivr.net/npm/qrious/dist/qrious.min.js"></script>
+  </head>
+  <body>
+    <h4>Tạo QR code cho mã thiết bị</h4>
+    <input type="text" id="equipId" placeholder="Nhập mã thiết bị..." style="width:80%">
+    <button onclick="genQr()">Tạo QR</button>
+    <br><br>
+    <canvas id="qr"></canvas>
+    <script>
+      function genQr() {
+        var id = document.getElementById('equipId').value.trim();
+        var qr = new QRious({
+          element: document.getElementById('qr'),
+          value: id,
+          size: 200
+        });
+      }
+    </script>
+  </body>
+</html>
+

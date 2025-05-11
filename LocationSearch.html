@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      /* Định dạng cơ bản */
+      body { 
+        font-family: Arial, sans-serif; 
+        padding: 10px; 
+        font-size: 13px; 
+      }
+      
+      /* Biểu mẫu tìm kiếm */
+      label { 
+        font-weight: bold; 
+        margin-right: 5px; 
+        display: block; 
+        margin-bottom: 5px; 
+      }
+      input[type="text"] { 
+        padding: 6px; 
+        width: calc(100% - 85px); 
+        margin-bottom: 10px;
+      }
+      button { 
+        padding: 6px 10px; 
+        margin-left: 5px; 
+        cursor: pointer;
+        vertical-align: top;
+      }
+      
+      /* Khu vực hiển thị kết quả và thông báo */
+      #loading { 
+        margin-top: 15px; 
+        font-style: italic; 
+        color: #555; 
+        display: none;
+      }
+      #error { 
+        margin-top: 10px; 
+        color: red; 
+        font-weight: bold;
+      }
+      #results { 
+        margin-top: 15px; 
+      }
+      
+      /* Tiêu đề và danh sách */
+      h3 { 
+        color: #4285f4; 
+        border-bottom: 1px solid #eee; 
+        padding-bottom: 3px; 
+        margin-top: 15px; 
+        margin-bottom: 5px; 
+        font-size: 1.1em; 
+      }
+      ul { 
+        list-style: none; 
+        padding-left: 0; 
+        margin-top: 5px; 
+      }
+      li { 
+        background-color: #f9f9f9; 
+        border: 1px solid #eee; 
+        padding: 8px; 
+        margin-bottom: 4px; 
+        border-radius: 3px; 
+        cursor: pointer;
+      }
+      li:hover {
+        background-color: #f0f0f0;
+      }
+      li strong { 
+        color: #333; 
+      }
+      .no-results { 
+        color: #777; 
+        margin-top: 10px;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <h4>Tra cứu theo Vị trí</h4>
+
+    <div>
+      <label for="locationInput">Vị trí:</label>
+      <input type="text" id="locationInput" list="locationList" placeholder="Nhập hoặc chọn vị trí...">
+      <datalist id="locationList"></datalist>
+      <button onclick="searchAssets()">Tìm kiếm</button>
+    </div>
+
+    <div id="loading">Đang tìm kiếm...</div>
+    <div id="error"></div>
+    <div id="results"></div>
+
+    <script>
+      /**
+       * Khởi tạo trang khi tải
+       * Lấy danh sách vị trí từ server để điền vào datalist
+       */
+      window.onload = function() {
+        google.script.run
+          .withSuccessHandler(populateDatalist)
+          .withFailureHandler(showError)
+          .getLocationList();
+      };
+
+      /**
+       * Điền danh sách vị trí vào datalist
+       * @param {Array<string>} locations Mảng các tên vị trí
+       */
+      function populateDatalist(locations) {
+        const dataList = document.getElementById('locationList');
+        dataList.innerHTML = '';
+        
+        if (locations && locations.length > 0) {
+          locations.forEach(location => {
+            if (location) {
+              const option = document.createElement('option');
+              option.value = location;
+              dataList.appendChild(option);
+            }
+          });
+        }
+      }
+
+      /**
+       * Tìm kiếm thiết bị và hệ thống theo vị trí
+       * Được gọi khi người dùng nhấn nút Tìm kiếm
+       */
+      function searchAssets() {
+        const locationName = document.getElementById('locationInput').value;
+        const resultsDiv = document.getElementById('results');
+        const errorDiv = document.getElementById('error');
+        const loadingDiv = document.getElementById('loading');
+
+        // Reset các phần tử hiển thị
+        resultsDiv.innerHTML = '';
+        errorDiv.innerHTML = '';
+
+        // Kiểm tra đầu vào
+        if (!locationName || locationName.trim() === "") {
+          errorDiv.textContent = 'Vui lòng nhập hoặc chọn một vị trí.';
+          return;
+        }
+
+        // Hiển thị trạng thái đang tải
+        loadingDiv.style.display = 'block';
+
+        // Gọi server để lấy dữ liệu
+        google.script.run
+          .withSuccessHandler(displayResults)
+          .withFailureHandler(showError)
+          .getAssetsByLocation(locationName.trim());
+      }
+
+      /**
+       * Hiển thị kết quả tìm kiếm
+       * @param {Object} results Kết quả trả về từ server
+       */
+      function displayResults(results) {
+        const resultsDiv = document.getElementById('results');
+        const loadingDiv = document.getElementById('loading');
+        
+        // Ẩn trạng thái đang tải
+        loadingDiv.style.display = 'none';
+        resultsDiv.innerHTML = '';
+
+        let content = '';
+        let foundSomething = false;
+
+        // Hiển thị Thiết bị
+        if (results && results.equipment && results.equipment.length > 0) {
+          foundSomething = true;
+          content += '<h3>Thiết bị</h3><ul>';
+          
+          results.equipment.forEach(eq => {
+            const id = escapeHtml(eq.id || 'N/A');
+            const name = escapeHtml(eq.name || 'Không có tên');
+            const type = escapeHtml(eq.type || 'Không có loại');
+            
+            content += `<li onclick="viewItemHistory('${escapeHtml(id)}')">
+                         <strong>${id}</strong> - ${name} <i>(${type})</i>
+                       </li>`;
+          });
+          
+          content += '</ul>';
+        }
+
+        // Hiển thị Hệ thống / Hạng mục
+        if (results && results.systems && results.systems.length > 0) {
+          foundSomething = true;
+          content += '<h3>Hệ thống / Hạng mục</h3><ul>';
+          
+          results.systems.forEach(sys => {
+            const code = escapeHtml(sys.code || 'N/A');
+            const description = escapeHtml(sys.description || 'Không có mô tả');
+            
+            content += `<li onclick="viewItemHistory('${escapeHtml(code)}')">
+                         <strong>${code}</strong> - ${description}
+                       </li>`;
+          });
+          
+          content += '</ul>';
+        }
+
+        // Nếu không tìm thấy kết quả nào
+        if (!foundSomething) {
+          content = '<p class="no-results">Không tìm thấy thiết bị hoặc hệ thống nào tại vị trí này.</p>';
+        }
+        
+        resultsDiv.innerHTML = content;
+      }
+
+      /**
+       * Mở dialog hiển thị lịch sử của một mục
+       * @param {string} targetCode Mã của thiết bị hoặc hệ thống
+       */
+      function viewItemHistory(targetCode) {
+        if (!targetCode) return;
+        
+        // Cập nhật trạng thái UI
+        document.getElementById('error').textContent = '';
+        document.getElementById('loading').textContent = 'Đang tải lịch sử cho ' + targetCode + '...';
+        document.getElementById('loading').style.display = 'block';
+
+        // Gọi hàm backend để mở dialog
+        google.script.run
+          .withSuccessHandler(onDialogOpened)
+          .withFailureHandler(showError)
+          .openHistoryDialogForCode(targetCode);
+      }
+
+      /**
+       * Xử lý sau khi dialog được mở thành công
+       */
+      function onDialogOpened(successResult) {
+        // Ẩn trạng thái đang tải
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('loading').textContent = 'Đang tìm kiếm...';
+        console.log('Yêu cầu mở dialog lịch sử đã được gửi thành công.');
+      }
+
+      /**
+       * Hiển thị thông báo lỗi
+       * @param {Object} err Đối tượng lỗi
+       */
+      function showError(err) {
+        const errorDiv = document.getElementById('error');
+        const loadingDiv = document.getElementById('loading');
+        
+        loadingDiv.style.display = 'none';
+        errorDiv.textContent = 'Lỗi: ' + (err.message || JSON.stringify(err));
+        console.error('Lỗi phía server:', err);
+      }
+
+      /**
+       * Xử lý an toàn chuỗi HTML
+       * @param {any} unsafe Giá trị cần xử lý
+       * @return {string} Chuỗi đã được xử lý an toàn
+       */
+      function escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') {
+          if (unsafe === null || unsafe === undefined) return '';
+          if (typeof unsafe === 'boolean') return unsafe ? 'Có' : 'Không';
+          if (typeof unsafe === 'number') {
+            return unsafe.toLocaleString('vi-VN');
+          }
+          unsafe = unsafe.toString();
+        }
+        
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+    </script>
+  </body>
+</html>

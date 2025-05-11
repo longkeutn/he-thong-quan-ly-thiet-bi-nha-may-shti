@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 15px;
+      font-size: 14px;
+    }
+    .warranty-card {
+      border: 1px solid #ddd;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    .warranty-status {
+      font-size: 16px;
+      padding: 8px;
+      border-radius: 4px;
+      margin: 10px 0 15px 0;
+      text-align: center;
+      font-weight: bold;
+    }
+    .in-warranty {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .out-warranty {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .info-row {
+      display: flex;
+      margin: 8px 0;
+    }
+    .label {
+      min-width: 140px;
+      font-weight: bold;
+    }
+    .value {
+      flex-grow: 1;
+    }
+    .actions {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+      text-align: center;
+    }
+    .btn {
+      margin: 5px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-warranty {
+      background-color: #4285f4;
+      color: white;
+    }
+    .btn-copy {
+      background-color: #34a853;
+      color: white;
+    }
+    .btn-external {
+      background-color: #ea4335;
+      color: white;
+    }
+    .btn-close {
+      background-color: #ddd;
+    }
+    .alert {
+      padding: 8px;
+      margin: 10px 0;
+      border-radius: 4px;
+      display: none;
+    }
+    .alert-success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .alert-error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <div class="warranty-card">
+    <h3>Kiểm tra bảo hành thiết bị</h3>
+    
+    <div id="warrantyStatus" class="warranty-status <?= data.status.includes('Còn bảo hành') ? 'in-warranty' : 'out-warranty' ?>">
+      <?= data.status ?>
+    </div>
+    
+    <div class="info-row">
+      <div class="label">Mã thiết bị:</div>
+      <div class="value" id="equipmentCode"><?= data.equipmentCode ?></div>
+    </div>
+    
+    <div class="info-row">
+      <div class="label">Nhà cung cấp:</div>
+      <div class="value" id="supplier"><?= data.supplier ?></div>
+    </div>
+    
+    <div class="info-row">
+      <div class="label">Mã mua hàng:</div>
+      <div class="value" id="purchaseId"><?= data.purchaseId ?></div>
+    </div>
+
+    <div class="info-row">
+      <div class="label">Thông tin liên hệ:</div>
+      <div class="value" id="contactInfo"><?= data.contactInfo ?></div>
+    </div>
+  </div>
+  
+  <div id="alert" class="alert"></div>
+  
+  <div class="actions">
+    <?if (data.status.includes('Còn bảo hành')) {?>
+      <button id="btnProcessWarranty" class="btn btn-warranty" onclick="processWarranty()">
+        Chuyển sang quy trình bảo hành
+      </button>
+      <button id="btnCopySupplierInfo" class="btn btn-copy" onclick="copySupplierInfo()">
+        Sao chép thông tin NCC
+      </button>
+    <?} else {?>
+      <button id="btnHireExternal" class="btn btn-external" onclick="hireExternal()">
+        Chuyển sang thuê ngoài
+      </button>
+    <?}?>
+    <button id="btnClose" class="btn btn-close" onclick="closeDialog()">Đóng</button>
+  </div>
+
+  <script>
+    // Xử lý chuyển sang quy trình bảo hành
+    function processWarranty() {
+      // Hiển thị tình trạng đang xử lý
+      document.getElementById('btnProcessWarranty').disabled = true;
+      document.getElementById('btnProcessWarranty').innerHTML = 'Đang xử lý...';
+      
+      // Gọi hàm server-side để cập nhật trạng thái phiếu công việc
+      const rowIndex = <?= data.rowIndex ?>;
+      const equipmentCode = document.getElementById('equipmentCode').innerText;
+      const supplier = document.getElementById('supplier').innerText;
+      
+      google.script.run
+        .withSuccessHandler(updateSuccess)
+        .withFailureHandler(updateError)
+        .updateWorkOrderForWarranty(rowIndex, equipmentCode, supplier);
+    }
+    
+    // Xử lý sao chép thông tin NCC
+    function copySupplierInfo() {
+      const supplierInfo = document.getElementById('supplier').innerText;
+      const contactInfo = document.getElementById('contactInfo').innerText;
+      
+      const text = `Nhà cung cấp: ${supplierInfo}\nThông tin liên hệ: ${contactInfo}`;
+      
+      // Sử dụng clipboard API (chỉ cho web hiện đại, không hoạt động trong Google Apps Script)
+      // Thay vào đó, ta sẽ hiển thị thông báo với thông tin cần sao chép
+      showAlert('Thông tin cần sao chép: ' + text, 'success');
+    }
+    
+    // Xử lý chuyển sang thuê ngoài
+    function hireExternal() {
+      // Hiển thị tình trạng đang xử lý
+      document.getElementById('btnHireExternal').disabled = true;
+      document.getElementById('btnHireExternal').innerHTML = 'Đang xử lý...';
+      
+      // Gọi hàm server-side để cập nhật trạng thái phiếu công việc
+      const rowIndex = <?= data.rowIndex ?>;
+      
+      google.script.run
+        .withSuccessHandler(updateSuccess)
+        .withFailureHandler(updateError)
+        .updateWorkOrderForExternal(rowIndex);
+    }
+    
+    // Xử lý thành công
+    function updateSuccess(result) {
+      if (result.success) {
+        showAlert(result.message, 'success');
+        // Đóng dialog sau 2 giây
+        setTimeout(closeDialog, 2000);
+      } else {
+        showAlert('Lỗi: ' + result.message, 'error');
+        resetButtons();
+      }
+    }
+    
+    // Xử lý lỗi
+    function updateError(error) {
+      showAlert('Lỗi: ' + error.message, 'error');
+      resetButtons();
+    }
+    
+    // Hiển thị thông báo
+    function showAlert(message, type) {
+      const alertElement = document.getElementById('alert');
+      alertElement.innerHTML = message;
+      alertElement.style.display = 'block';
+      alertElement.className = 'alert alert-' + type;
+    }
+    
+    // Reset trạng thái nút
+    function resetButtons() {
+      if (document.getElementById('btnProcessWarranty')) {
+        document.getElementById('btnProcessWarranty').disabled = false;
+        document.getElementById('btnProcessWarranty').innerHTML = 'Chuyển sang quy trình bảo hành';
+      }
+      if (document.getElementById('btnHireExternal')) {
+        document.getElementById('btnHireExternal').disabled = false;
+        document.getElementById('btnHireExternal').innerHTML = 'Chuyển sang thuê ngoài';
+      }
+    }
+    
+    // Đóng dialog
+    function closeDialog() {
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>

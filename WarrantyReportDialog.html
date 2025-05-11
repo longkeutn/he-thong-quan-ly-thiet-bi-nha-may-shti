@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 15px;
+      font-size: 13px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #4285f4;
+    }
+    .stats {
+      font-size: 12px;
+      color: #555;
+    }
+    .tab-container {
+      margin-bottom: 15px;
+    }
+    .tab-button {
+      padding: 8px 12px;
+      background-color: #f1f1f1;
+      border: none;
+      cursor: pointer;
+      margin-right: 2px;
+      border-radius: 4px 4px 0 0;
+    }
+    .tab-button.active {
+      background-color: #4285f4;
+      color: white;
+    }
+    .counter {
+      background-color: #fff;
+      color: #333;
+      border-radius: 10px;
+      padding: 2px 6px;
+      font-size: 11px;
+      margin-left: 5px;
+    }
+    .tab-button.active .counter {
+      background-color: #fff;
+      color: #4285f4;
+    }
+    .tab-content {
+      display: none;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 0 4px 4px 4px;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background-color: #f8f8f8;
+      position: sticky;
+      top: 0;
+    }
+    tr:hover {
+      background-color: #f5f5f5;
+    }
+    .table-container {
+      max-height: 380px;
+      overflow-y: auto;
+      margin-bottom: 15px;
+    }
+    .actions {
+      display: flex;
+      justify-content: space-between;
+    }
+    .button {
+      padding: 8px 12px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .button:hover {
+      background-color: #3367d6;
+    }
+    .search-box {
+      padding: 8px;
+      width: 100%;
+      margin-bottom: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .status-badge {
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .status-active {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .status-near {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    .status-expired {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .status-unknown {
+      background-color: #e2e3e5;
+      color: #383d41;
+    }
+    .date-cell {
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">Báo cáo Thiết bị theo Bảo hành</div>
+    <div class="stats">
+      Ngày báo cáo: <?= Utilities.formatDate(today, Session.getScriptTimeZone(), "dd/MM/yyyy") ?>
+    </div>
+  </div>
+  
+  <div class="tab-container">
+    <button class="tab-button active" onclick="openTab('active')">
+      Còn bảo hành <span class="counter"><?= data.activeWarranty.length ?></span>
+    </button>
+    <button class="tab-button" onclick="openTab('near')">
+      Sắp hết hạn (<?= nearExpiryDays ?> ngày) <span class="counter"><?= data.nearExpiry.length ?></span>
+    </button>
+    <button class="tab-button" onclick="openTab('expired')">
+      Hết bảo hành <span class="counter"><?= data.expired.length ?></span>
+    </button>
+    <button class="tab-button" onclick="openTab('unknown')">
+      Không có TT <span class="counter"><?= data.noWarrantyInfo.length ?></span>
+    </button>
+    <button class="tab-button" onclick="openTab('all')">
+      Tất cả <span class="counter"><?= data.activeWarranty.length + data.nearExpiry.length + data.expired.length + data.noWarrantyInfo.length ?></span>
+    </button>
+  </div>
+  
+  <input type="text" id="searchBox" class="search-box" placeholder="Tìm kiếm theo mã, tên, loại, vị trí, NCC..." onkeyup="filterTable()">
+  
+  <div id="active" class="tab-content active">
+    <div class="table-container">
+      <table id="activeTable">
+        <tr>
+          <th>Mã TB</th>
+          <th>Tên thiết bị</th>
+          <th>Loại TB</th>
+          <th>Vị trí</th>
+          <th>NCC</th>
+          <th>Hạn bảo hành</th>
+        </tr>
+        <? for (var i = 0; i < data.activeWarranty.length; i++) { ?>
+          <tr>
+            <td><?= data.activeWarranty[i].id ?></td>
+            <td><?= data.activeWarranty[i].name ?></td>
+            <td><?= data.activeWarranty[i].type ?></td>
+            <td><?= data.activeWarranty[i].location ?></td>
+            <td><?= data.activeWarranty[i].supplier ?></td>
+            <td class="date-cell"><?= data.activeWarranty[i].warrantyEnd ? Utilities.formatDate(data.activeWarranty[i].warrantyEnd, Session.getScriptTimeZone(), "dd/MM/yyyy") : "" ?></td>
+          </tr>
+        <? } ?>
+      </table>
+    </div>
+  </div>
+  
+  <div id="near" class="tab-content">
+    <div class="table-container">
+      <table id="nearTable">
+        <tr>
+          <th>Mã TB</th>
+          <th>Tên thiết bị</th>
+          <th>Loại TB</th>
+          <th>Vị trí</th>
+          <th>NCC</th>
+          <th>Hạn bảo hành</th>
+        </tr>
+        <? for (var i = 0; i < data.nearExpiry.length; i++) { ?>
+          <tr>
+            <td><?= data.nearExpiry[i].id ?></td>
+            <td><?= data.nearExpiry[i].name ?></td>
+            <td><?= data.nearExpiry[i].type ?></td>
+            <td><?= data.nearExpiry[i].location ?></td>
+            <td><?= data.nearExpiry[i].supplier ?></td>
+            <td class="date-cell"><?= data.nearExpiry[i].warrantyEnd ? Utilities.formatDate(data.nearExpiry[i].warrantyEnd, Session.getScriptTimeZone(), "dd/MM/yyyy") : "" ?></td>
+          </tr>
+        <? } ?>
+      </table>
+    </div>
+  </div>
+  
+  <div id="expired" class="tab-content">
+    <div class="table-container">
+      <table id="expiredTable">
+        <tr>
+          <th>Mã TB</th>
+          <th>Tên thiết bị</th>
+          <th>Loại TB</th>
+          <th>Vị trí</th>
+          <th>NCC</th>
+          <th>Hạn bảo hành</th>
+        </tr>
+        <? for (var i = 0; i < data.expired.length; i++) { ?>
+          <tr>
+            <td><?= data.expired[i].id ?></td>
+            <td><?= data.expired[i].name ?></td>
+            <td><?= data.expired[i].type ?></td>
+            <td><?= data.expired[i].location ?></td>
+            <td><?= data.expired[i].supplier ?></td>
+            <td class="date-cell"><?= data.expired[i].warrantyEnd ? Utilities.formatDate(data.expired[i].warrantyEnd, Session.getScriptTimeZone(), "dd/MM/yyyy") : "" ?></td>
+          </tr>
+        <? } ?>
+      </table>
+    </div>
+  </div>
+  
+  <div id="unknown" class="tab-content">
+    <div class="table-container">
+      <table id="unknownTable">
+        <tr>
+          <th>Mã TB</th>
+          <th>Tên thiết bị</th>
+          <th>Loại TB</th>
+          <th>Vị trí</th>
+          <th>NCC</th>
+          <th>Hạn bảo hành</th>
+        </tr>
+        <? for (var i = 0; i < data.noWarrantyInfo.length; i++) { ?>
+          <tr>
+            <td><?= data.noWarrantyInfo[i].id ?></td>
+            <td><?= data.noWarrantyInfo[i].name ?></td>
+            <td><?= data.noWarrantyInfo[i].type ?></td>
+            <td><?= data.noWarrantyInfo[i].location ?></td>
+            <td><?= data.noWarrantyInfo[i].supplier ?></td>
+            <td>Không có thông tin</td>
+          </tr>
+        <? } ?>
+      </table>
+    </div>
+  </div>
+  
+  <div id="all" class="tab-content">
+    <div class="table-container">
+      <table id="allTable">
+        <tr>
+          <th>Mã TB</th>
+          <th>Tên thiết bị</th>
+          <th>Loại TB</th>
+          <th>Vị trí</th>
+          <th>NCC</th>
+          <th>Hạn bảo hành</th>
+          <th>Trạng thái</th>
+        </tr>
+        <? for (var i = 0; i < data.activeWarranty.length; i++) { ?>
+          <tr>
+            <td><?= data.activeWarranty[i].id ?></td>
+            <td><?= data.activeWarranty[i].name ?></td>
+            <td><?= data.activeWarranty[i].type ?></td>
+            <td><?= data.activeWarranty[i].location ?></td>
+            <td><?= data.activeWarranty[i].supplier ?></td>
+            <td class="date-cell"><?= data.activeWarranty[i].warrantyEnd ? Utilities.formatDate(data.activeWarranty[i].warrantyEnd, Session.getScriptTimeZone(), "dd/MM/yyyy") : "" ?></td>
+            <td><span class="status-badge status-active">Còn BH</span></td>
+          </tr>
+        <? } ?>
+        <? for (var i = 0; i < data.nearExpiry.length; i++) { ?>
+          <tr>
+            <td><?= data.nearExpiry[i].id ?></td>
+            <td><?= data.nearExpiry[i].name ?></td>
+            <td><?= data.nearExpiry[i].type ?></td>
+            <td><?= data.nearExpiry[i].location ?></td>
+            <td><?= data.nearExpiry[i].supplier ?></td>
+            <td class="date-cell"><?= data.nearExpiry[i].warrantyEnd ? Utilities.formatDate(data.nearExpiry[i].warrantyEnd, Session.getScriptTimeZone(), "dd/MM/yyyy") : "" ?></td>
+            <td><span class="status-badge status-near">Sắp hết</span></td>
+          </tr>
+        <? } ?>
+        <? for (var i = 0; i < data.expired.length; i++) { ?>
+          <tr>
+            <td><?= data.expired[i].id ?></td>
+            <td><?= data.expired[i].name ?></td>
+            <td><?= data.expired[i].type ?></td>
+            <td><?= data.expired[i].location ?></td>
+            <td><?= data.expired[i].supplier ?></td>
+            <td class="date-cell"><?= data.expired[i].warrantyEnd ? Utilities.formatDate(data.expired[i].warrantyEnd, Session.getScriptTimeZone(), "dd/MM/yyyy") : "" ?></td>
+            <td><span class="status-badge status-expired">Hết BH</span></td>
+          </tr>
+        <? } ?>
+        <? for (var i = 0; i < data.noWarrantyInfo.length; i++) { ?>
+          <tr>
+            <td><?= data.noWarrantyInfo[i].id ?></td>
+            <td><?= data.noWarrantyInfo[i].name ?></td>
+            <td><?= data.noWarrantyInfo[i].type ?></td>
+            <td><?= data.noWarrantyInfo[i].location ?></td>
+            <td><?= data.noWarrantyInfo[i].supplier ?></td>
+            <td>Không có thông tin</td>
+            <td><span class="status-badge status-unknown">Không có TT</span></td>
+          </tr>
+        <? } ?>
+      </table>
+    </div>
+  </div>
+  
+  <div class="actions">
+    <button class="button" onclick="exportToSheet()">Xuất ra sheet mới</button>
+    <button class="button" onclick="google.script.host.close()">Đóng</button>
+  </div>
+  
+  <script>
+    function openTab(tabName) {
+      const tabContents = document.getElementsByClassName("tab-content");
+      for (let i = 0; i < tabContents.length; i++) {
+        tabContents[i].classList.remove("active");
+      }
+      
+      const tabButtons = document.getElementsByClassName("tab-button");
+      for (let i = 0; i < tabButtons.length; i++) {
+        tabButtons[i].classList.remove("active");
+      }
+      
+      document.getElementById(tabName).classList.add("active");
+      document.querySelector(`.tab-button[onclick="openTab('${tabName}')"]`).classList.add("active");
+    }
+    
+    function filterTable() {
+      const searchText = document.getElementById("searchBox").value.toLowerCase();
+      const tables = ["activeTable", "nearTable", "expiredTable", "unknownTable", "allTable"];
+      
+      tables.forEach(tableId => {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        
+        const rows = table.getElementsByTagName("tr");
+        
+        for (let i = 1; i < rows.length; i++) { // Start from 1 to skip header
+          let matchFound = false;
+          const cells = rows[i].getElementsByTagName("td");
+          
+          for (let j = 0; j < cells.length; j++) {
+            const cellText = cells[j].textContent || cells[j].innerText;
+            if (cellText.toLowerCase().indexOf(searchText) > -1) {
+              matchFound = true;
+              break;
+            }
+          }
+          
+          rows[i].style.display = matchFound ? "" : "none";
+        }
+      });
+    }
+    
+    function exportToSheet() {
+      // Lấy tab đang hiển thị
+      const activeTab = document.querySelector('.tab-content.active').id;
+      
+      // Gọi server-side function để xuất dữ liệu
+      google.script.run
+        .withSuccessHandler(function(result) {
+          alert("Đã xuất báo cáo thành công!");
+        })
+        .withFailureHandler(function(error) {
+          alert("Lỗi khi xuất báo cáo: " + error);
+        })
+        .exportWarrantyReport(activeTab);
+    }
+  </script>
+</body>
+</html>

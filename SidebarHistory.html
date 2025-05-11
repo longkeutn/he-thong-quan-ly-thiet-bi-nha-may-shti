@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { 
+        font-family: Arial, sans-serif; 
+        padding: 10px; 
+        font-size: 12px; 
+        margin: 0; 
+        box-sizing: border-box; 
+      }
+      
+      /* Bảng dữ liệu chính */
+      table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin-top: 10px; 
+        table-layout: fixed; 
+      }
+      th, td { 
+        border: 1px solid #ddd; 
+        padding: 4px 5px; 
+        text-align: left; 
+        vertical-align: middle; 
+        word-wrap: break-word; 
+      }
+      th { 
+        background-color: #f0f0f0; 
+        font-weight: bold; 
+        text-align: center; 
+        white-space: normal; 
+      }
+      tbody tr:nth-child(even) { background-color: #f9f9f9; }
+      tbody tr:hover { 
+        background-color: #e9e9e9; 
+        cursor: pointer; 
+      }
+      
+      /* Định nghĩa độ rộng cột */
+      th:nth-child(1) { width: 20%; } /* Ngày */
+      th:nth-child(2) { width: 20%; } /* Loại HĐ */
+      th:nth-child(3) { width: 40%; } /* Mô tả */
+      th:nth-child(4) { width: 20%; } /* Trạng thái CV */
+      
+      /* Các thành phần khác */
+      #loading { 
+        margin-top: 15px; 
+        font-style: italic; 
+        color: #555; 
+        text-align: center; 
+      }
+      #error { 
+        margin-top: 10px; 
+        color: red; 
+        font-weight: bold;
+      }
+      h4 { 
+        margin-top: 0; 
+        margin-bottom: 10px; 
+        color: #4285f4; 
+        border-bottom: 1px solid #eee; 
+        padding-bottom: 5px; 
+        font-size: 14px;
+      }
+      p.no-results { 
+        color: #777; 
+        margin-top: 10px; 
+        text-align: center;
+      }
+      #historyTableContainer { overflow-x: auto; }
+
+      /* CSS cho phần hiển thị chi tiết */
+      #detailsDisplay {
+        display: none;
+        margin-top: 15px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        background-color: #f0f8ff;
+        border-radius: 4px;
+        font-size: 11px;
+      }
+      #detailsDisplay h5 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        color: #0056b3;
+        border-bottom: 1px dashed #ccc;
+        padding-bottom: 4px;
+        font-size: 13px;
+      }
+      #detailsDisplay p {
+        margin: 3px 0;
+        line-height: 1.4;
+      }
+      #detailsDisplay p strong {
+        display: inline-block;
+        min-width: 100px;
+        color: #333;
+      }
+    </style>
+  </head>
+  <body>
+    <h4>Lịch sử TB: <span id="equipmentId">Đang tải...</span></h4>
+    <div id="loading">Đang tải dữ liệu...</div>
+    <div id="error"></div>
+    <div id="historyTableContainer"></div>
+    <div id="detailsDisplay"></div>
+
+    <script>
+      // Biến toàn cục lưu trữ dữ liệu lịch sử 
+      let fullHistoryData = [];
+
+      /**
+       * Hiển thị dữ liệu lịch sử nhận được từ server
+       */
+      function displayHistory(dataFromServer) {
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const container = document.getElementById('historyTableContainer');
+        const equipmentIdSpan = document.getElementById('equipmentId');
+        const detailsDiv = document.getElementById('detailsDisplay');
+
+        // Reset trạng thái
+        loadingDiv.style.display = 'none';
+        container.innerHTML = '';
+        errorDiv.textContent = '';
+        detailsDiv.style.display = 'none';
+        fullHistoryData = [];
+
+        if (!dataFromServer || dataFromServer.length !== 2) {
+          errorDiv.textContent = 'Lỗi: Dữ liệu trả về không hợp lệ.';
+          equipmentIdSpan.textContent = 'Lỗi';
+          return;
+        }
+
+        const historyData = dataFromServer[0];
+        const eqId = dataFromServer[1];
+        equipmentIdSpan.textContent = eqId || 'Không xác định';
+        fullHistoryData = historyData;
+
+        if (historyData && historyData.length > 0) {
+          // Tạo bảng với 4 cột chính
+          let table = '<table><thead><tr>' +
+                      '<th>Ngày</th>' +
+                      '<th>Loại HĐ</th>' +
+                      '<th>Mô tả</th>' +
+                      '<th>Trạng thái</th>' +
+                      '</tr></thead><tbody>';
+
+          historyData.forEach((record, index) => {
+            const date = record.date ? escapeHtml(record.date) : '';
+            const workType = record.workType ? escapeHtml(record.workType) : '';
+            const description = record.description ? escapeHtml(record.description) : '';
+            const status = record.status ? escapeHtml(record.status) : '';
+
+            table += `<tr onclick="showRowDetails(${index})">` +
+                     `<td>${date}</td>` +
+                     `<td>${workType}</td>` +
+                     `<td>${description}</td>` +
+                     `<td>${status}</td>` +
+                     `</tr>`;
+          });
+          
+          table += '</tbody></table>';
+          container.innerHTML = table;
+        } else if (historyData && historyData.length === 0) {
+          container.innerHTML = '<p class="no-results">Không tìm thấy bản ghi lịch sử nào.</p>';
+        } else {
+          errorDiv.textContent = 'Có lỗi xảy ra khi tải dữ liệu lịch sử.';
+        }
+      }
+
+      /**
+       * Hiển thị chi tiết của một hàng khi được nhấp vào
+       */
+      function showRowDetails(index) {
+        if (index >= 0 && index < fullHistoryData.length) {
+          const record = fullHistoryData[index];
+          const detailsDiv = document.getElementById('detailsDisplay');
+
+          // Xây dựng nội dung HTML chi tiết
+          let detailsHtml = `<h5>Chi tiết Công việc (ID: ${escapeHtml(record.id || 'N/A')})</h5>`;
+          detailsHtml += `<p><strong>Ngày thực hiện:</strong> ${escapeHtml(record.date)}</p>`;
+          detailsHtml += `<p><strong>Loại Hoạt Động:</strong> ${escapeHtml(record.workType)}</p>`;
+          detailsHtml += `<p><strong>Mô tả Công việc:</strong> ${escapeHtml(record.description)}</p>`;
+          detailsHtml += `<p><strong>Người thực hiện:</strong> ${escapeHtml(record.performer)}</p>`;
+          detailsHtml += `<p><strong>Chi tiết ĐV Ngoài:</strong> ${escapeHtml(record.externalDetails)}</p>`;
+          detailsHtml += `<p><strong>Chi phí (VND):</strong> ${escapeHtml(record.cost)}</p>`;
+          detailsHtml += `<p><strong>Trạng thái CV:</strong> ${escapeHtml(record.status)}</p>`;
+          detailsHtml += `<p><strong>Theo Bảo Hành?:</strong> ${escapeHtml(record.warrantyCheck)}</p>`;
+          detailsHtml += `<p><strong>Mã YC BH NCC:</strong> ${escapeHtml(record.warrantyReqId)}</p>`;
+          detailsHtml += `<p><strong>Trạng thái YC BH:</strong> ${escapeHtml(record.warrantyReqStat)}</p>`;
+          detailsHtml += `<p><strong>Ghi chú YC BH:</strong> ${escapeHtml(record.warrantyReqNote)}</p>`;
+          detailsHtml += `<p><strong>Trạng thái TB sau HĐ:</strong> ${escapeHtml(record.assetPostStatus)}</p>`;
+          detailsHtml += `<p><strong>Ghi chú Chi tiết:</strong> ${escapeHtml(record.detailNote)}</p>`;
+
+          detailsDiv.innerHTML = detailsHtml;
+          detailsDiv.style.display = 'block';
+        }
+      }
+
+      /**
+       * Hàm xử lý bảo mật và định dạng dữ liệu
+       */
+      function escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') {
+          if (unsafe === null || unsafe === undefined) return '';
+          if (typeof unsafe === 'boolean') return unsafe ? 'Có' : 'Không';
+          if (typeof unsafe === 'number') {
+            return unsafe.toLocaleString('vi-VN');
+          }
+          unsafe = unsafe.toString();
+        }
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      // Khởi tạo dữ liệu khi sidebar được tải
+      google.script.run
+        .withSuccessHandler(displayHistory)
+        .withFailureHandler(err => {
+          document.getElementById('error').textContent = 'Lỗi thực thi Script: ' + err.message;
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('equipmentId').textContent = 'Lỗi';
+        })
+        .getHistoryForSidebar();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      /* CSS cho nội dung Dialog */
+      body { 
+        font-family: Arial, sans-serif; 
+        padding: 15px; 
+        font-size: 12px; 
+        margin: 0; 
+      }
+      
+      /* Bảng dữ liệu */
+      table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin-top: 10px; 
+        table-layout: fixed; 
+      }
+      th, td { 
+        border: 1px solid #ccc; 
+        padding: 5px 6px; 
+        text-align: left; 
+        vertical-align: middle; 
+        word-wrap: break-word; 
+      }
+      th { 
+        background-color: #e9e9e9; 
+        font-weight: bold; 
+        text-align: center; 
+        white-space: normal; 
+      }
+      tbody tr:nth-child(even) { 
+        background-color: #f7f7f7; 
+      }
+      
+      /* Độ rộng cột cho Dialog */
+      th:nth-child(1) { width: 13%; } /* Ngày */
+      th:nth-child(2) { width: 15%; } /* Loại HĐ */
+      th:nth-child(3) { width: 25%; } /* Mô tả */
+      th:nth-child(4) { width: 15%; } /* Người TH */
+      th:nth-child(5) { width: 12%; } /* Trạng thái CV */
+      th:nth-child(6) { width: 8%; }  /* Theo BH? */
+      th:nth-child(7) { width: 12%; } /* Ghi chú CT */
+      
+      /* Thông báo không có dữ liệu */
+      p.no-results { 
+        color: #777; 
+        margin-top: 15px; 
+        text-align: center; 
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <? if (historyData && historyData.length > 0) { ?>
+      <table>
+        <thead>
+          <tr>
+            <th>Ngày</th>
+            <th>Loại HĐ</th>
+            <th>Mô tả Công việc</th>
+            <th>Người TH</th>
+            <th>Trạng thái CV</th>
+            <th>Theo BH?</th>
+            <th>Ghi chú CT</th>
+          </tr>
+        </thead>
+        <tbody>
+          <? for (var i = 0; i < historyData.length; i++) {
+               var record = historyData[i];
+               // Lấy và chuẩn bị dữ liệu
+               var date = record.date || '';
+               var workType = record.workType || '';
+               var description = record.description || '';
+               var performer = record.performer || '';
+               var status = record.status || '';
+               var warrantyCheck = record.warrantyCheck !== null ? (record.warrantyCheck ? 'Có' : 'Không') : '';
+               var detailNote = record.detailNote || '';
+          ?>
+            <tr>
+              <td><?= date ?></td>
+              <td><?= workType ?></td>
+              <td><?= description ?></td>
+              <td><?= performer ?></td>
+              <td><?= status ?></td>
+              <td><?= warrantyCheck ?></td>
+              <td><?= detailNote ?></td>
+            </tr>
+          <? } ?>
+        </tbody>
+      </table>
+    <? } else { ?>
+      <p class="no-results">Không tìm thấy bản ghi lịch sử nào cho đối tượng này.</p>
+    <? } ?>
+  </body>
+</html>

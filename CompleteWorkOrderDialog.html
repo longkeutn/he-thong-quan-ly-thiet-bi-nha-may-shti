@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <script src="//code.jquery.com/jquery-3.6.0.js"></script>
+    <script src="//code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+    <style>
+      /* CSS cho dialog hoàn thành phiếu công việc */
+      body { 
+        font-family: Arial, sans-serif; 
+        padding: 15px; 
+        font-size: 13px; 
+      }
+      
+      /* Form và các thành phần */
+      .form-group { 
+        margin-bottom: 12px; 
+      }
+      label { 
+        display: block; 
+        font-weight: bold; 
+        margin-bottom: 4px; 
+        color: #333; 
+      }
+      input[type="text"], 
+      input[type="number"], 
+      select, 
+      textarea { 
+        width: 95%; 
+        padding: 8px; 
+        border: 1px solid #ccc; 
+        border-radius: 4px; 
+        font-size: 13px; 
+      }
+      input[type="date"] { 
+        width: auto; 
+        padding: 7px; 
+      }
+      textarea { 
+        min-height: 60px; 
+        resize: vertical; 
+      }
+      
+      /* Phần thông tin chỉ đọc */
+      .readonly-info { 
+        background-color: #f5f5f5; 
+        padding: 6px; 
+        border: 1px solid #eee; 
+        margin-bottom: 5px; 
+        font-size: 12px;
+      }
+      .readonly-info strong {
+        color: #555;
+      }
+      
+      /* Nút và thông báo */
+      button { 
+        padding: 10px 15px; 
+        background-color: #4CAF50; 
+        color: white; 
+        border: none; 
+        border-radius: 4px; 
+        cursor: pointer; 
+        font-size: 14px; 
+      }
+      button:hover { 
+        background-color: #45a049; 
+      }
+      .btn-secondary {
+        background-color: #6c757d;
+      }
+      .btn-secondary:hover {
+        background-color: #5a6268;
+      }
+      .btn-info {
+        background-color: #17a2b8;
+      }
+      .btn-info:hover {
+        background-color: #138496;
+      }
+      
+      #error { 
+        color: red; 
+        margin-top: 10px; 
+        font-weight: bold;
+      }
+      #loading { 
+        display: none; 
+        margin-top: 10px; 
+        font-style: italic; 
+        color: #555; 
+      }
+      .required-label::after { 
+        content: " *"; 
+        color: red; 
+      }
+      
+      /* Thông báo */
+      #message {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+      }
+      .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      
+      /* Giao diện phần xử lý đơn vị ngoài và bảo hành */
+      .service-section {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 10px;
+        margin-top: 15px;
+        background-color: #f9f9f9;
+      }
+      .service-option {
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+      .indent-section {
+        margin-left: 20px; 
+        padding: 10px; 
+        border-left: 1px solid #ccc;
+      }
+      .form-check {
+        margin-top: 10px;
+        margin-bottom: 10px;
+      }
+      .input-group {
+        display: flex;
+        align-items: center;
+      }
+      .input-group select {
+        flex: 1;
+      }
+      .input-group button {
+        margin-left: 5px;
+        padding: 8px 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h4>Hoàn thành Phiếu Công Việc & Lưu Lịch sử</h4>
+
+    <div id="message" style="display:none;"></div>
+
+    <div id="initialData">
+      <p class="readonly-info"><strong>Mã Phiếu CV:</strong> <span id="woId"></span></p>
+      <p class="readonly-info"><strong>Đối tượng/Hệ thống:</strong> <span id="targetCode"></span> (<span id="targetName"></span>)</p>
+      <p class="readonly-info"><strong>Vị trí:</strong> <span id="location"></span></p>
+      <p class="readonly-info"><strong>Loại CV:</strong> <span id="workType"></span></p>
+      <p class="readonly-info"><strong>Yêu cầu/Vấn đề:</strong> <span id="requestDesc"></span></p>
+      <p class="readonly-info"><strong>Người/Nhóm được giao:</strong> <span id="assignedTo"></span></p>
+    </div>
+    <hr>
+
+    <form id="completionForm">
+      <div class="form-group">
+        <label for="completionDate" class="required-label">Ngày Hoàn thành Thực tế:</label>
+        <input type="text" id="completionDate" required>
+      </div>
+
+      <div class="form-group">
+        <label for="completionDesc" class="required-label">Mô tả Hoàn thành / Kết quả:</label>
+        <textarea id="completionDesc" rows="4" required></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="partsUsed">Vật tư sử dụng:</label>
+        <textarea id="partsUsed" rows="2"></textarea>
+      </div>
+
+      <!-- Phần xử lý phương án - Đã sửa cấu trúc -->
+      <div class="service-section">
+        <div class="form-group">
+          <label class="service-option">Phương án xử lý:</label>
+          <select id="handlingOption" onchange="handleProcessingOptionChange()">
+            <option value="Xử lý nội bộ">Xử lý nội bộ</option>
+            <option value="Bảo hành NCC">Yêu cầu bảo hành NCC</option>
+            <option value="Thuê đơn vị ngoài">Thuê đơn vị ngoài</option>
+          </select>
+        </div>
+
+        <!-- Phần bảo hành -->
+        <div id="warrantySection" class="indent-section" style="display:none;">
+          <div class="form-group">
+  <label for="warrantyVendor">Nhà cung cấp bảo hành:</label>
+  <div class="input-group">
+    <select id="warrantyVendor" onchange="loadVendorInfo(this.value)">
+      <option value="">-- Chọn nhà cung cấp --</option>
+      <?!= vendorOptions ?>
+    </select>
+    <button type="button" class="btn-info" onclick="findOriginalVendor()">
+      Tìm NCC gốc
+    </button>
+  </div>
+</div>
+
+          <div class="form-group">
+            <label for="warrantyReqId">Mã YC bảo hành NCC:</label>
+            <input type="text" id="warrantyReqId">
+          </div>
+          <div class="form-group">
+            <label for="warrantyReqStatus">Trạng thái yêu cầu BH:</label>
+            <select id="warrantyReqStatus">
+              <option value="Đã gửi yêu cầu">Đã gửi yêu cầu</option>
+              <option value="Đã xác nhận">Đã xác nhận</option>
+              <option value="Đang xử lý">Đang xử lý</option>
+              <option value="Hoàn thành">Hoàn thành</option>
+              <option value="Từ chối">Từ chối</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="warrantyNote">Ghi chú bảo hành:</label>
+            <textarea id="warrantyNote" rows="2"></textarea>
+          </div>
+        </div>
+
+        <!-- Phần đơn vị ngoài/NCC -->
+        <div id="externalVendorSection" class="indent-section" style="display:none;">
+          <div class="form-group">
+            <label for="externalVendor">Đơn vị ngoài/NCC:</label>
+            <div class="input-group">
+              <select id="externalVendor" onchange="handleVendorSelection()">
+                <option value="">-- Chọn đơn vị --</option>
+                <option value="new">+ Thêm đơn vị mới</option>
+                <?!= vendorOptions ?>
+              </select>
+              <button type="button" class="btn-info" onclick="showVendorDetails()">
+                Chi tiết
+              </button>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="externalVendorDetails">Chi tiết đơn vị ngoài/NCC:</label>
+            <textarea id="externalVendorDetails" rows="2"
+              placeholder="Thông tin chi tiết về đơn vị ngoài/NCC"><?= workOrderData.externalVendorDetails ?></textarea>
+          </div>
+          
+          <!-- Form thêm đơn vị mới -->
+          <div id="newVendorForm" style="display:none; margin-top: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            <h4 style="margin-top:0;">Thêm đơn vị mới</h4>
+            <div class="form-group">
+              <label>Tên đơn vị:</label>
+              <input type="text" id="newVendorName">
+            </div>
+            <div class="form-group">
+              <label>Loại đơn vị:</label>
+              <select id="newVendorType">
+                <option value="NCC Gốc">NCC Gốc</option>
+                <option value="Đơn vị sửa chữa">Đơn vị sửa chữa</option>
+                <option value="Đơn vị tư vấn">Đơn vị tư vấn</option>
+                <option value="Khác">Khác</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Thông tin liên hệ:</label>
+              <textarea id="newVendorContact" rows="2" placeholder="Điện thoại, email, địa chỉ..."></textarea>
+            </div>
+            <div style="text-align:right;">
+              <button type="button" class="btn-secondary" onclick="cancelNewVendor()">Hủy</button>
+              <button type="button" onclick="saveNewVendor()">Lưu</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="assetStatus" class="required-label">Trạng thái TB/HT sau HĐ:</label>
+        <select id="assetStatus" required>
+          <option value="">-- Chọn trạng thái --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="cost">Chi phí (VND):</label>
+        <input type="number" id="cost" min="0" step="any">
+      </div>
+
+      <div class="form-group">
+        <label for="detailNote">Ghi chú chi tiết (Lịch sử):</label>
+        <textarea id="detailNote" rows="2"></textarea>
+      </div>
+
+      <input type="hidden" id="workOrderRowIndex">
+
+      <button type="button" onclick="submitCompletion()">Lưu vào Lịch sử</button>
+    </form>
+
+    <div id="loading">Đang xử lý...</div>
+    <div id="error"></div>
+
+    <script>
+      // Dữ liệu ban đầu từ backend
+      const serverWorkOrderData = <?!= JSON.stringify(workOrderData || null) ?>;
+      const serverStatusOptions = <?!= JSON.stringify(statusOptions || []) ?>;
+      
+      // Hàm điền dữ liệu ban đầu và dropdown
+      function loadInitialData(workOrderData, statusOptions) {
+        console.log("Initial WorkOrder Data:", workOrderData);
+        console.log("Initial Status Options:", statusOptions);
+
+        // Điền thông tin phiếu công việc ban đầu
+        if (workOrderData) {
+          document.getElementById('woId').textContent = workOrderData.maPhieuCV || 'N/A';
+          document.getElementById('targetCode').textContent = workOrderData.doiTuong || 'N/A';
+          document.getElementById('targetName').textContent = workOrderData.tenDoiTuong || '';
+          document.getElementById('location').textContent = workOrderData.viTri || '';
+          document.getElementById('workType').textContent = workOrderData.loaiCV || '';
+          document.getElementById('requestDesc').textContent = workOrderData.moTaYC || '';
+          document.getElementById('assignedTo').textContent = workOrderData.nguoiGiao || '';
+          document.getElementById('workOrderRowIndex').value = workOrderData.rowIndex || '';
+
+          // Điền các giá trị hoàn thành đã có (nếu có)
+          document.getElementById('completionDesc').value = workOrderData.moTaHT || '';
+          document.getElementById('partsUsed').value = workOrderData.vatTu || '';
+          
+          // Xử lý ngày hoàn thành (nếu có)
+          if (workOrderData.ngayHTTT) {
+            // Kiểm tra nếu là đối tượng Date (từ backend) hoặc chuỗi
+            if (Object.prototype.toString.call(workOrderData.ngayHTTT) === '[object Date]') {
+              const d = workOrderData.ngayHTTT;
+              const day = ('0' + d.getDate()).slice(-2);
+              const month = ('0' + (d.getMonth() + 1)).slice(-2);
+              const year = d.getFullYear();
+              $('#completionDate').val(`${day}/${month}/${year}`);
+            } else if (typeof workOrderData.ngayHTTT === 'string') {
+              $('#completionDate').val(workOrderData.ngayHTTT);
+            }
+          }
+
+          document.getElementById('assetStatus').value = workOrderData.trangThaiTBSau || '';
+          document.getElementById('cost').value = workOrderData.chiPhi || '';
+          document.getElementById('detailNote').value = workOrderData.ghiChuLS || '';
+          
+          // Điền thông tin đơn vị ngoài nếu có
+          if (workOrderData.externalVendorDetails) {
+            document.getElementById('externalVendorDetails').value = workOrderData.externalVendorDetails;
+            // Hiển thị phần đơn vị ngoài nếu có thông tin
+            document.getElementById('handlingOption').value = "Thuê đơn vị ngoài";
+            handleProcessingOptionChange();
+          }
+        } else {
+          showError({message: "Không nhận được dữ liệu Phiếu Công Việc để hiển thị."});
+        }
+
+        // Điền các lựa chọn cho Trạng thái TB sau HĐ
+        const statusSelect = document.getElementById('assetStatus');
+        statusSelect.innerHTML = '<option value="">-- Chọn trạng thái --</option>'; // Luôn reset trước
+        
+        if (statusOptions && statusOptions.length > 0) {
+          statusOptions.forEach(status => {
+            if (status) {
+              const option = document.createElement('option');
+              option.value = status;
+              option.textContent = status;
+              statusSelect.appendChild(option);
+            }
+          });
+          
+          // Đặt lại giá trị đã chọn trước đó (nếu có)
+          if (workOrderData && workOrderData.trangThaiTBSau) {
+            statusSelect.value = workOrderData.trangThaiTBSau;
+          }
+        } else {
+          console.warn("Không có tùy chọn nào cho Trạng thái TB sau HĐ.");
+          // Thêm option báo lỗi
+          const option = document.createElement('option');
+          option.value = "";
+          option.textContent = "Lỗi tải danh sách";
+          option.disabled = true;
+          statusSelect.appendChild(option);
+        }
+
+        // Khởi tạo datepicker
+        $('#completionDate').datepicker({ dateFormat: 'dd/mm/yy' });
+      }
+
+      // Gọi loadInitialData khi script chạy
+      window.onload = function() {
+        if (serverWorkOrderData) {
+          loadInitialData(serverWorkOrderData, serverStatusOptions);
+        } else {
+          showError({message: "Không nhận được dữ liệu Phiếu Công Việc ban đầu từ server."});
+        }
+      };
+      
+      // Xử lý thay đổi phương án xử lý
+      function handleProcessingOptionChange() {
+        const selectedOption = document.getElementById('handlingOption').value;
+        
+        // Ẩn tất cả các phần trước
+        document.getElementById('warrantySection').style.display = 'none';
+        document.getElementById('externalVendorSection').style.display = 'none';
+        
+        // Hiển thị phần tương ứng với lựa chọn
+        if (selectedOption === "Bảo hành NCC") {
+          document.getElementById('warrantySection').style.display = 'block';
+          
+          // Tự động cập nhật trạng thái thiết bị liên quan đến bảo hành
+          updateAssetStatusForWarranty();
+        } 
+        else if (selectedOption === "Thuê đơn vị ngoài") {
+          document.getElementById('externalVendorSection').style.display = 'block';
+        }
+      }
+      
+      // Cập nhật trạng thái thiết bị liên quan đến bảo hành
+      function updateAssetStatusForWarranty() {
+        const assetStatus = document.getElementById('assetStatus');
+        
+        if (assetStatus && assetStatus.options.length > 0) {
+          // Tìm trạng thái liên quan đến bảo hành
+          for (let i = 0; i < assetStatus.options.length; i++) {
+            const option = assetStatus.options[i];
+            if (option.text.includes('bảo hành') || 
+                option.text.includes('Bảo hành') || 
+                option.text.includes('BH')) {
+              assetStatus.selectedIndex = i;
+              break;
+            }
+          }
+        }
+      }
+
+      // Hàm xử lý khi chọn đơn vị
+      function handleVendorSelection() {
+        const vendorSelect = document.getElementById('externalVendor');
+        const newVendorForm = document.getElementById('newVendorForm');
+        
+        if (vendorSelect.value === 'new') {
+          newVendorForm.style.display = 'block';
+        } else {
+          newVendorForm.style.display = 'none';
+          // Nếu chọn NCC có sẵn, điền thông tin vào textarea
+          if (vendorSelect.value) {
+            const vendorText = vendorSelect.options[vendorSelect.selectedIndex].text;
+            document.getElementById('externalVendorDetails').value = vendorText;
+          }
+        }
+      }
+
+      // Hàm hủy thêm đơn vị mới
+      function cancelNewVendor() {
+        document.getElementById('newVendorForm').style.display = 'none';
+        document.getElementById('externalVendor').value = '';
+      }
+
+      // Hàm lưu đơn vị mới
+      function saveNewVendor() {
+        const name = document.getElementById('newVendorName').value;
+        const type = document.getElementById('newVendorType').value;
+        const contact = document.getElementById('newVendorContact').value;
+        
+        if (!name) {
+          alert("Vui lòng nhập tên đơn vị!");
+          return;
+        }
+        
+        // Hiển thị trạng thái đang lưu
+        const saveBtn = document.querySelector('#newVendorForm button:last-child');
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = 'Đang lưu...';
+        saveBtn.disabled = true;
+        
+        // Lưu đơn vị mới
+        google.script.run
+          .withSuccessHandler(function(result) {
+            // Khôi phục nút
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+            
+            if (result.success) {
+              // Thêm đơn vị mới vào danh sách
+              const vendorSelect = document.getElementById('externalVendor');
+              const newOption = document.createElement('option');
+              newOption.value = result.id;
+              newOption.text = name + ' (' + type + ')';
+              
+              // Thêm option mới vào đúng vị trí (sau option đầu tiên)
+              const secondOption = vendorSelect.options[1]; // "Thêm mới" là option[0]
+              vendorSelect.insertBefore(newOption, secondOption);
+              vendorSelect.value = result.id;
+              
+              // Cập nhật textarea
+              document.getElementById('externalVendorDetails').value = name + ' (' + type + ')';
+              
+              // Ẩn form
+              document.getElementById('newVendorForm').style.display = 'none';
+              
+              // Reset form
+              document.getElementById('newVendorName').value = '';
+              document.getElementById('newVendorContact').value = '';
+              
+              // Thông báo
+              showMessage("Đã thêm đơn vị mới: " + name, "success");
+            } else {
+              showMessage("Lỗi: " + result.message, "error");
+            }
+          })
+          .withFailureHandler(function(error) {
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+            showMessage("Lỗi: " + error, "error");
+          })
+          .saveNewVendor(name, type, contact);
+      }
+
+      // Hiển thị thông tin chi tiết đơn vị
+      function showVendorDetails() {
+        const vendorId = document.getElementById('externalVendor').value;
+        if (!vendorId || vendorId === 'new') {
+          alert("Vui lòng chọn một đơn vị trước");
+          return;
+        }
+        
+        google.script.run
+          .withSuccessHandler(function(details) {
+            alert("Thông tin đơn vị:\n\n" + details);
+          })
+          .withFailureHandler(function(error) {
+            alert("Lỗi khi lấy thông tin: " + error);
+          })
+          .getVendorDetails(vendorId);
+      }
+
+      // Hàm gửi dữ liệu để lưu
+      function submitCompletion() {
+        const errorDiv = document.getElementById('error');
+        errorDiv.textContent = '';
+        
+        if (document.getElementById('handlingOption').value === "Bảo hành NCC") {
+    // Đảm bảo thông tin NCC được lưu vào externalVendorDetails nếu chưa có
+    if (!document.getElementById('externalVendorDetails').value && 
+        document.getElementById('warrantyNote').value) {
+      document.getElementById('externalVendorDetails').value = 
+        "NCC Bảo hành: " + document.getElementById('warrantyNote').value;
+    }
+  }
+        // Thu thập dữ liệu form
+        const completionData = {
+          rowIndex: document.getElementById('workOrderRowIndex').value,
+          completionDateStr: document.getElementById('completionDate').value.trim(),
+          completionDesc: document.getElementById('completionDesc').value.trim(),
+          partsUsed: document.getElementById('partsUsed').value.trim(),
+          assetStatus: document.getElementById('assetStatus').value,
+          cost: document.getElementById('cost').value || 0,
+          detailNote: document.getElementById('detailNote').value.trim(),
+          // Lấy lại thông tin gốc cần thiết
+          targetCode: document.getElementById('targetCode').textContent,
+          workType: document.getElementById('workType').textContent,
+          performer: document.getElementById('assignedTo').textContent,
+          
+          // Thông tin xử lý
+          handlingOption: document.getElementById('handlingOption').value,
+          
+          // Thông tin bảo hành - đã cập nhật
+    warrantyCheck: document.getElementById('handlingOption').value === "Bảo hành NCC",
+    warrantyVendorId: document.getElementById('warrantyVendor') ? document.getElementById('warrantyVendor').value : "",
+    warrantyVendorName: document.getElementById('warrantyVendor') && document.getElementById('warrantyVendor').selectedIndex > 0 
+      ? document.getElementById('warrantyVendor').options[document.getElementById('warrantyVendor').selectedIndex].text 
+      : "",
+    warrantyReqId: document.getElementById('warrantyReqId') ? document.getElementById('warrantyReqId').value.trim() : "",
+    warrantyStatus: document.getElementById('warrantyReqStatus') ? document.getElementById('warrantyReqStatus').value : "",
+    warrantyNote: document.getElementById('warrantyNote') ? document.getElementById('warrantyNote').value.trim() : "",
+          
+          // Thông tin đơn vị ngoài
+          externalVendorDetails: document.getElementById('externalVendorDetails') ? document.getElementById('externalVendorDetails').value.trim() : ""
+        };
+
+        // Kiểm tra các trường bắt buộc
+        if (!completionData.completionDateStr || !completionData.completionDesc || !completionData.assetStatus) {
+          errorDiv.textContent = 'Lỗi: Vui lòng điền đầy đủ thông tin bắt buộc (*).';
+          return;
+        }
+        
+        // Kiểm tra định dạng ngày
+        const dateRegex = /^([0-9]{2})\/([0-9]{2})\/([0-9]{4})$/;
+        if (!dateRegex.test(completionData.completionDateStr)) {
+          errorDiv.textContent = 'Lỗi: Ngày Hoàn thành phải có định dạng dd/mm/yyyy.';
+          return;
+        }
+
+        // Hiển thị trạng thái đang xử lý
+        document.getElementById('loading').style.display = 'block';
+        
+        // Gửi dữ liệu lên server
+        google.script.run
+          .withSuccessHandler(onSaveSuccess)
+          .withFailureHandler(showError)
+          .saveHistoryFromDialog(completionData);
+      }
+
+      // Xử lý khi lưu thành công
+      function onSaveSuccess(result) {
+        document.getElementById('loading').style.display = 'none';
+        if (result && result.success) {
+          google.script.host.close();
+        } else {
+          showError({message: result.message || "Lưu không thành công."});
+        }
+      }
+
+      // Hiển thị lỗi
+      function showError(err) {
+        console.error("!!! Lỗi:", err);
+        const errorDiv = document.getElementById('error');
+        const loadingDiv = document.getElementById('loading');
+        loadingDiv.style.display = 'none';
+        errorDiv.textContent = 'Lỗi: ' + (err.message || JSON.stringify(err));
+      }
+
+      // Hiển thị thông báo
+      function showMessage(message, type) {
+        const messageDiv = document.getElementById('message') || document.createElement('div');
+        if (!document.getElementById('message')) {
+          messageDiv.id = 'message';
+          document.querySelector('form').prepend(messageDiv);
+        }
+        
+        messageDiv.textContent = message;
+        messageDiv.className = type === 'error' ? 'alert-danger' : 'alert-success';
+        messageDiv.style.display = 'block';
+        
+        // Tự ẩn sau 5 giây
+        setTimeout(function() {
+          messageDiv.style.display = 'none';
+        }, 5000);
+      }
+
+      // Hàm xử lý an toàn chuỗi HTML
+      function escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') {
+          if (unsafe === null || unsafe === undefined) return '';
+          if (typeof unsafe === 'boolean') return unsafe ? 'Có' : 'Không';
+          if (typeof unsafe === 'number') { return unsafe.toLocaleString('vi-VN'); }
+          unsafe = unsafe.toString();
+        }
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+      // Hàm tìm nhà cung cấp gốc từ dữ liệu thiết bị
+function findOriginalVendor() {
+  const targetCode = document.getElementById('targetCode').textContent.trim();
+  if (!targetCode) {
+    alert("Không tìm thấy mã thiết bị/hệ thống");
+    return;
+  }
+  
+  // Hiển thị đang tìm kiếm
+  const button = document.activeElement;
+  const originalText = button.innerHTML;
+  button.innerHTML = "Đang tìm...";
+  button.disabled = true;
+  
+  console.log("Đang tìm thông tin NCC cho mã thiết bị:", targetCode);
+  
+  // Gọi hàm server-side mới
+  google.script.run
+    .withSuccessHandler(function(result) {
+      // Khôi phục nút
+      button.innerHTML = originalText;
+      button.disabled = false;
+      
+      if (result && result.vendor) {
+        // Tìm thấy NCC
+        fillVendorInfo(result);
+        alert("Đã tìm thấy thông tin NCC: " + result.vendor);
+      } else {
+        // Không tìm thấy
+        alert("Không tìm thấy thông tin NCC cho thiết bị: " + targetCode + 
+              "\nLỗi: " + (result.error || "Không xác định"));
+        console.log("Kết quả trả về:", result);
+      }
+    })
+    .withFailureHandler(function(error) {
+      // Xử lý lỗi
+      button.innerHTML = originalText;
+      button.disabled = false;
+      console.error("Lỗi khi tìm NCC:", error);
+      alert("Lỗi khi tìm thông tin NCC: " + error);
+    })
+    .findVendorInfoFromDeviceCatalog(targetCode); // Thay đổi tên hàm gọi ở đây
+
+}
+
+// Hàm điền thông tin nhà cung cấp vào form
+function fillVendorInfo(vendorInfo) {
+  // Tạo hoặc cập nhật option trong dropdown
+  const vendorSelect = document.getElementById('warrantyVendor');
+  
+  // Kiểm tra xem option đã tồn tại chưa
+  let vendorOption = null;
+  for (let i = 0; i < vendorSelect.options.length; i++) {
+    if (vendorSelect.options[i].value === vendorInfo.id) {
+      vendorOption = vendorSelect.options[i];
+      break;
+    }
+  }
+  
+  // Nếu chưa có, tạo mới
+  if (!vendorOption) {
+    vendorOption = document.createElement('option');
+    vendorOption.value = vendorInfo.id;
+    vendorOption.text = vendorInfo.vendor + " (NCC Gốc)";
+    vendorSelect.appendChild(vendorOption);
+  }
+  
+  // Chọn nhà cung cấp
+  vendorSelect.value = vendorInfo.id;
+
+  // THÊM DÒNG NÀY: Cập nhật externalVendorDetails để lưu vào sheet Lịch sử
+  document.getElementById('externalVendorDetails').value = "NCC Gốc: " + vendorInfo.vendor + 
+    (vendorInfo.contact ? " - " + vendorInfo.contact : "");
+
+  // Điền thông tin liên hệ và bảo hành
+  const warrantyNote = document.getElementById('warrantyNote');
+  let noteText = "NCC Gốc: " + vendorInfo.vendor + "\n";
+  
+  if (vendorInfo.purchaseDate) {
+    noteText += "Ngày mua: " + formatDate(vendorInfo.purchaseDate) + "\n";
+  }
+  
+  if (vendorInfo.warrantyExpires) {
+    noteText += "Bảo hành đến: " + formatDate(vendorInfo.warrantyExpires) + "\n";
+    
+    // Kiểm tra hết hạn bảo hành
+    const today = new Date();
+    const expiryDate = new Date(vendorInfo.warrantyExpires);
+    if (today > expiryDate) {
+      noteText += "⚠️ ĐÃ HẾT HẠN BẢO HÀNH\n";
+    }
+  }
+  
+  if (vendorInfo.contact) {
+    noteText += "Liên hệ: " + vendorInfo.contact;
+  }
+  
+  warrantyNote.value = noteText;
+}
+
+// Hàm định dạng ngày
+function formatDate(dateStr) {
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+// Hàm load thông tin vendor khi chọn từ dropdown
+function loadVendorInfo(vendorId) {
+  if (!vendorId) return;
+  
+  const vendorSelect = document.getElementById('warrantyVendor');
+  const selectedIndex = vendorSelect.selectedIndex;
+  
+  if (selectedIndex > 0) {
+    const vendorName = vendorSelect.options[selectedIndex].text;
+    document.getElementById('warrantyNote').value = "Nhà cung cấp: " + vendorName;
+  }
+}
+
+    </script>
+  </body>
+</html>

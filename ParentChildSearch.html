@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      /* CSS cơ bản cho Sidebar Tra cứu Cha-Con */
+      body { 
+        font-family: Arial, sans-serif; 
+        padding: 10px; 
+        font-size: 12px; 
+        margin: 0; 
+        box-sizing: border-box;
+      }
+      
+      /* Form và controls */
+      label { 
+        font-weight: bold; 
+        margin-right: 5px; 
+        display: block; 
+        margin-bottom: 3px;
+      }
+      select { 
+        padding: 6px; 
+        margin-right: 5px; 
+        width: calc(100% - 85px);
+        display: inline-block; 
+      }
+      button { 
+        padding: 6px 10px; 
+        cursor: pointer; 
+        vertical-align: top;
+      }
+      
+      /* Khu vực hiển thị */
+      #loading { 
+        margin-top: 15px; 
+        font-style: italic; 
+        color: #555; 
+        display: none;
+      }
+      #error { 
+        margin-top: 10px; 
+        color: red; 
+        font-weight: bold;
+      }
+      #results { 
+        margin-top: 15px; 
+        border-top: 1px solid #eee; 
+        padding-top: 10px;
+      }
+      
+      /* Tiêu đề và danh sách */
+      h5 { 
+        margin-top: 0px; 
+        margin-bottom: 8px; 
+        color: #333; 
+        padding-bottom: 3px; 
+        font-size: 1.1em;
+      }
+      ul { 
+        list-style: disc; 
+        padding-left: 20px; 
+        margin-top: 5px; 
+      }
+      li { 
+        margin-bottom: 5px; 
+        line-height: 1.4; 
+      }
+      li:hover {
+        background-color: #f0f0f0;
+        cursor: pointer;
+      }
+      li strong { 
+        color: #000; 
+      }
+      .no-results { 
+        color: #777; 
+        margin-top: 10px; 
+        font-style: italic;
+      }
+      .clickable-item { 
+        cursor: pointer; 
+      }
+    </style>
+  </head>
+  <body>
+    <h4>Tra cứu Thiết bị Con</h4>
+
+    <div>
+      <label for="parentSelect">Chọn Mã Thiết bị Cha:</label><br>
+      <select id="parentSelect">
+        <option value="">-- Đang tải danh sách... --</option>
+      </select>
+      <button onclick="findChildren()">Tìm con</button>
+    </div>
+
+    <div id="loading">Đang tìm kiếm...</div>
+    <div id="error"></div>
+    <div id="results"></div>
+
+    <script>
+      /**
+       * Khởi tạo khi trang được tải
+       * Lấy danh sách mã thiết bị cha từ server
+       */
+      window.onload = function() {
+        console.log("ParentChildSearch.html: window.onload đã chạy. Chuẩn bị gọi getAllEquipmentIds...");
+        document.getElementById('loading').textContent = 'Đang tải danh sách Mã TB Cha...';
+        document.getElementById('loading').style.display = 'block';
+        
+        google.script.run
+          .withSuccessHandler(populateParentDropdown)
+          .withFailureHandler(showError)
+          .getAllEquipmentIds();
+      };
+
+      /**
+       * Điền danh sách mã thiết bị cha vào dropdown
+       * @param {Array<string>} equipmentIds Danh sách mã thiết bị
+       */
+      function populateParentDropdown(equipmentIds) {
+        console.log("populateParentDropdown được gọi. Dữ liệu nhận được:", equipmentIds); 
+        document.getElementById('loading').style.display = 'none';
+        
+        const select = document.getElementById('parentSelect');
+        select.innerHTML = '<option value="">-- Chọn Mã Thiết bị Cha --</option>';
+        
+        if (equipmentIds && equipmentIds.length > 0) {
+          equipmentIds.forEach(id => {
+            if (id) {
+              const option = document.createElement('option');
+              option.value = id;
+              option.textContent = id;
+              select.appendChild(option);
+            }
+          });
+        } else {
+          select.innerHTML = '<option value="">-- Không tìm thấy Mã TB nào --</option>';
+          console.log("populateParentDropdown: Không nhận được danh sách Mã TB hợp lệ từ backend.");
+        }
+      }
+
+      /**
+       * Gọi khi nhấn nút "Tìm con"
+       * Lấy danh sách thiết bị con của thiết bị cha được chọn
+       */
+      function findChildren() {
+        const parentId = document.getElementById('parentSelect').value;
+        const resultsDiv = document.getElementById('results');
+        const errorDiv = document.getElementById('error');
+        const loadingDiv = document.getElementById('loading');
+
+        // Reset trạng thái giao diện
+        resultsDiv.innerHTML = '';
+        errorDiv.textContent = '';
+
+        // Kiểm tra lựa chọn
+        if (!parentId) {
+          errorDiv.textContent = 'Vui lòng chọn một Mã Thiết bị Cha từ danh sách.';
+          return;
+        }
+
+        // Hiển thị trạng thái tìm kiếm
+        loadingDiv.textContent = `Đang tìm thiết bị con cho ${parentId}...`;
+        loadingDiv.style.display = 'block';
+
+        // Gọi backend để lấy dữ liệu
+        google.script.run
+          .withSuccessHandler(displayChildren)
+          .withFailureHandler(showError)
+          .getChildEquipment(parentId);
+      }
+
+      /**
+       * Hiển thị danh sách thiết bị con
+       * @param {Array<Object>} children Danh sách thiết bị con
+       */
+      function displayChildren(children) {
+        console.log(">>> displayChildren START. Nhận được số con:", children ? children.length : 'null/undefined');
+
+        const resultsDiv = document.getElementById('results');
+        const loadingDiv = document.getElementById('loading');
+        
+        // Ẩn trạng thái tìm kiếm
+        loadingDiv.style.display = 'none';
+        resultsDiv.innerHTML = '';
+
+        // Lấy mã thiết bị cha đã chọn
+        const parentId = document.getElementById('parentSelect').value;
+        let content = `<h5>Thiết bị con của: ${escapeHtml(parentId)}</h5>`;
+
+        // Hiển thị thiết bị con
+        if (children && children.length > 0) {
+          content += '<ul>';
+          
+          children.forEach(child => {
+            const id = escapeHtml(child.id || 'N/A');
+            const name = escapeHtml(child.name || 'Không tên');
+            const type = escapeHtml(child.type || 'Không loại');
+            const location = escapeHtml(child.location || 'Không vị trí');
+            
+            content += `<li class="clickable-item" onclick="viewItemHistory('${id}')">
+                         <strong>${id}</strong> - ${name} <i>(${type})</i> | Vị trí: ${location}
+                       </li>`;
+          });
+          
+          content += '</ul>';
+        } else {
+          content += '<p class="no-results">Không tìm thấy thiết bị con nào.</p>';
+        }
+        
+        resultsDiv.innerHTML = content;
+        console.log(">>> displayChildren END.");
+      }
+
+      /**
+       * Mở dialog hiển thị lịch sử thiết bị con
+       * @param {string} targetCode Mã thiết bị con
+       */
+      function viewItemHistory(targetCode) {
+        if (!targetCode) return;
+        
+        console.log("Yêu cầu xem lịch sử cho:", targetCode);
+        document.getElementById('error').textContent = '';
+        document.getElementById('loading').textContent = 'Đang yêu cầu mở lịch sử cho ' + targetCode + '...';
+        document.getElementById('loading').style.display = 'block';
+
+        // Gọi backend để mở dialog lịch sử
+        google.script.run
+          .withSuccessHandler(onDialogOpened)
+          .withFailureHandler(showError)
+          .openHistoryDialogForCode(targetCode);
+      }
+
+      /**
+       * Xử lý khi dialog được mở thành công
+       */
+      function onDialogOpened(successResult) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('loading').textContent = 'Đang tìm kiếm...';
+        console.log('Yêu cầu mở dialog lịch sử đã được gửi thành công.');
+      }
+
+      /**
+       * Hiển thị lỗi
+       * @param {Object} err Đối tượng lỗi
+       */
+      function showError(err) {
+        console.error("!!! Hàm showError đã được gọi với lỗi:", err);
+        const errorDiv = document.getElementById('error');
+        const loadingDiv = document.getElementById('loading');
+        
+        loadingDiv.style.display = 'none';
+        loadingDiv.textContent = 'Đang tìm kiếm...';
+        errorDiv.textContent = 'Lỗi: ' + err.message;
+      }
+
+      /**
+       * Xử lý an toàn chuỗi HTML
+       * @param {any} unsafe Giá trị cần xử lý
+       * @return {string} Chuỗi đã được xử lý an toàn
+       */
+      function escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') {
+          if (unsafe === null || unsafe === undefined) return '';
+          if (typeof unsafe === 'boolean') return unsafe ? 'Có' : 'Không';
+          if (typeof unsafe === 'number') return unsafe.toLocaleString('vi-VN');
+          unsafe = unsafe.toString();
+        }
+        
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+    </script>
+  </body>
+</html>
